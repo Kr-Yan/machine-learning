@@ -22,7 +22,7 @@ This assignment works through the details estimating an unknown mean, $\mu$, and
 
 ### IMPORTANT!!!
 
-Certain code chunks are created for you. Each code chunk has `eval=FALSE` set in the chunk options. You **MUST** change it to be `eval=TRUE` in order for the code chunks to be evaluated when rendering the document.  
+Certain code chunks are created for you. Each code chunk has `eval=TRUE` set in the chunk options. You **MUST** change it to be `eval=TRUE` in order for the code chunks to be evaluated when rendering the document.  
 
 You are free to add more code chunks if you would like.  
 
@@ -118,7 +118,7 @@ Thus, before defining the log-posterior function, you must create an `R` list wh
 
 #### SOLUTION
 
-```{r, solution_01c, eval=FALSE}
+```{r, solution_01c, eval=TRUE}
 hw06_info <- list(
   xobs = hw06_df$x,### the meausrements
   mu_0 = 11,### mu_0 value
@@ -141,7 +141,7 @@ The `my_info` second argument is a generic name, but you will assume it is a lis
 
 #### SOLUTION
 
-```{r, solution_01d, eval=FALSE}
+```{r, solution_01d, eval=TRUE}
 my_logpost <- function(unknowns, my_info)
 {
   # unpack the unknowns into separate variables
@@ -174,8 +174,8 @@ my_logpost(test_uk1,hw06_info)
 Test out the function to check that it works as expected. Try a value of 7 for $\mu$ and a value of 1.5 for $\sigma$. If you programmed the `my_logpost()` function correctly, you should get a value of -78.65353 printed to the screen.  
 
 ```{r, solution_01d_c}
-test_uk1=c(7,1.5)
-my_logpost(test_uk1,hw06_info)
+test_uk2=c(7,1.5)
+my_logpost(test_uk2,hw06_info)
 ### 
 ```
 
@@ -206,19 +206,19 @@ You will use the `expand.grid()` function to create a grid of combinations of `m
 
 Define the bounds on the two parameters:  
 
-```{r, solution_01e, eval=FALSE}
-mu_grid_lwr <- 
-mu_grid_upr <- 
+```{r, solution_01e, eval=TRUE}
+mu_grid_lwr <- 9.5
+mu_grid_upr <- 12.5
 
-sigma_grid_lwr <- 
-sigma_grid_upr <- 
+sigma_grid_lwr <- 1
+sigma_grid_upr <- qnorm(0.99, 11,0.5)
 ```
 
 Define the grid of parameter combinations.  
 
-```{r, solution_01e_b, eval=FALSE}
-param_grid <- expand.grid(mu = ,
-                          sigma = ,
+```{r, solution_01e_b, eval=TRUE}
+param_grid <- expand.grid(mu = seq(mu_grid_lwr, mu_grid_upr,length.out=251),
+                          sigma =seq(sigma_grid_lwr,sigma_grid_upr,length.out=251),
                           KEEP.OUT.ATTRS = FALSE, stringsAsFactors = FALSE) %>% 
   as.data.frame() %>% tibble::as_tibble()
 ```
@@ -237,24 +237,30 @@ This problem tests that you understand how to call a function, and how to input 
 
 #### SOLUTION
 
-```{r, solution_01f, eval=FALSE}
-eval_logpost <- function(unknown_1, unknown_2, logpost_func, logpost_info)
-{
+```{r, solution_01f, eval=TRUE}
+eval_logpost <- function(unknown_1, unknown_2, logpost_func, logpost_info){
+  a <- c()
+ for (i in 1: length(unknown_1)){
+  ml=c(unknown_1[i], unknown_2[i])
+  n=logpost_func(ml, logpost_info)
+  a[i]=n
+  }
+  return(a)}
   ### 
-}
+#}
 ```
 
 Test out `eval_logpost()`. You should get the same as result that you did in Problem 1d). Remember the third argument to `eval_logpost()` is the log-posterior function we want to call.  
 
 ```{r, solution_01f_b}
-### 
+b=eval_logpost(param_grid$mu, param_grid$sigma, my_logpost,hw06_info)
 ```
 
 ### 1g)
 
-The code chunk below uses the `purrr::map2_dfr()` function to apply the `eval_logpost()` function to all combinations of `mu` and `sigma` within `param_grid`. Be sure to set the `eval` flag to `TRUE` after you run the code chunk, because by default `eval=FALSE`. The result is assigned to the variable `log_post_result`. You can check the RStudio Environment Panel to see that the length of `log_post_result` is equal to the number of rows in `param_grid`.  
+The code chunk below uses the `purrr::map2_dfr()` function to apply the `eval_logpost()` function to all combinations of `mu` and `sigma` within `param_grid`. Be sure to set the `eval` flag to `TRUE` after you run the code chunk, because by default `eval=TRUE`. The result is assigned to the variable `log_post_result`. You can check the RStudio Environment Panel to see that the length of `log_post_result` is equal to the number of rows in `param_grid`.  
 
-```{r, apply_over_grid, eval=FALSE}
+```{r, apply_over_grid, eval=TRUE}
 log_post_result <- purrr::map2_dbl(param_grid$mu, param_grid$sigma,
                                    eval_logpost,
                                    logpost_func = my_logpost,
@@ -272,7 +278,7 @@ The code chunk below visualizes the log-posterior surface for you. The log-poste
 
 What do you think?  
 
-```{r, solution_01g, eval=FALSE}
+```{r, solution_01g, eval=TRUE}
 param_grid %>% 
   mutate(log_post = log_post_result,
          log_post_2 = log_post - max(log_post)) %>% 
@@ -281,17 +287,18 @@ param_grid %>%
   stat_contour(mapping = aes(z = log_post_2),
                breaks = log(c(0.01/100, 0.01, 0.1, 0.5, 0.9)),
                size = 2.2,
-               color = "black") +
+               color = "black")  +
   # include the sample average (xbar) and the sample standard deviation (xsd)
-  geom_point(data = tibble::tibble(xbar = , xsd = ),
+  geom_point(data = tibble::tibble(xbar = x_mean, xsd =x_sdd ),
              mapping = aes(x = xbar, y = xsd),
              shape = 22,
              size = 4.5, fill = "orange", color = "steelblue") +
-  scale_fill_viridis_c(guide = FALSE, option = "viridis",
+  scale_fill_viridis_c(guide = "none", option = "viridis",
                        limits = log(c(0.01/100, 1.0))) +
   labs(x = expression(mu), y = expression(sigma)) +
   theme_bw()
 ```
+The sample average and standard deviation located in the contour line that represent top 50% of $\mu$ and $\sigma$ combination, while the posterior located in the center of the top 100% of $\mu$ and $\sigma$ combination.The sample average is a less than 10.5, while the mode $\mu$ is close to 11. So they are not similiar. The posterior uncertainty in $\mu$ is the horizontal width, and the posterior uncertainty in $\sigma$ is the vertical height. There are a high uncertainties in posterior $\mu$ and $\sigma$.
 
 ## Problem 02
 
@@ -315,6 +322,16 @@ You wrote out the un-normalized log-posterior on $\mu$, determined the first der
 
 Include as many equation blocks as you feel are necessary.  
 
+Based on previous homework, this is the first derivative of un-normalized posterior
+$$
+\frac{N}{\sigma^{2}} ( \bar{x}-\mu)-\frac{1}{\tau_{0}^{2}}(\mu-\mu_{0})
+$$
+The second derivative equals:
+$$
+\frac{d}{d\mu} \frac{N}{\sigma^{2}} ( \bar{x}-\mu)-\frac{d}{d\mu} \frac{1}{\tau_{0}^{2}}(\mu-\mu_{0})= \\
+-\frac{N}{\sigma^{2}} - \frac{1}{\tau_{0}^{2}}
+$$
+
 ### 2b)
 
 You determined the expression for the posterior mode in Problem 2d) of Homework 04.  
@@ -323,7 +340,7 @@ You determined the expression for the posterior mode in Problem 2d) of Homework 
 
 #### SOLUTION
 
-What do you think?  
+Because after getting the second derivative, we found that the second derivative will be less than 0, given all other constances have to be equal or greater than 0. When second derivative is less than 0, the curve concave down, and the correspond $\mu$ is the local maximum value. 
 
 ### 2c)
 
@@ -341,6 +358,14 @@ where $\mathrm{m}_N$ is the Laplace Approximation posterior mean and $\mathrm{s}
 
 Include as many equation blocks as you feel are necessary.  
 
+$$
+\frac{1}{S_{N}^2}=\frac{N}{\sigma^2}+\frac{1}{\tau_0^2}
+$$
+
+$$
+m_{N}=\frac{\frac{1}{\sigma^2}}{\frac{1}{\tau_{0}^2}+\frac{N}{\sigma^{2}}}\sum_{n=1}^{N} {x}+\frac{\frac{1}{\tau_{0}^{2}}}{\frac{1}{\tau_{0}^2}+\frac{N}{\sigma^{2}}} \mu_{0}
+$$
+
 ### 2d)
 
 We saw in lecture how the Laplace Approximation is just that, an approximation. However, for this specific application (one parameter normal-normal model with an unknown mean) the Laplace Approximation is **not** an approximation. In fact, the expressions for the posterior mean and posterior precision were discussed in lecture.  
@@ -350,7 +375,7 @@ We saw in lecture how the Laplace Approximation is just that, an approximation. 
 #### SOLUTION
 
 What do you think?  
-
+The Laplace Approximation equal to the exact posterior distribution is because it is a 1-Dimensional density function. There's no distance between variables, since there's only one variable. The Laplace Approximation therefore equal to the exact posterior distribution.
 ## Problem 03
 
 Let's now return to the two parameter application from Problem 01 with the goal of learning the unknown mean, $\mu$, and unknown noise, $\sigma$. However, before applying the Laplace Approximation to this setting, you will perform a change-of-variables transformation to $\sigma$. The transformed variable, $\varphi$, is related to $\sigma$ through the transformation or transformation function $g\left(\cdot\right)$:  
