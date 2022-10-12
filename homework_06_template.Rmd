@@ -556,7 +556,7 @@ cv_param_grid %>%
                size = 2.2,
                color = "black") +
   # include the sample average (xbar) and the log-sample standard deviation (log_xsd)
-  geom_point(data = tibble::tibble(xbar = x_mean, log_xsd =x_sdd ),
+  geom_point(data = tibble::tibble(xbar = x_mean, log_xsd =log(x_sdd) ),
              mapping = aes(x = xbar, y = log_xsd),
              shape = 22,
              size = 4.5, fill = "orange", color = "steelblue") +
@@ -578,6 +578,7 @@ The code chunk below defines two different initial guesses for the unknown mean,
 init_guess_01 <- c(10, 0.75)
 
 init_guess_02 <- c(11.75, 1.85)
+mu = c(init_guess_01[1],init_guess_02[1])
 ```
 
 Let's first visualize these two points relative to the posterior mode, since you know what the log-posterior surface looks like.  
@@ -586,7 +587,7 @@ Let's first visualize these two points relative to the posterior mode, since you
 
 #### SOLUTION
 
-```{r, solution_04a, eval=FALSE}
+```{r, solution_04a, eval=TRUE}
 cv_param_grid %>% 
   mutate(log_post = log_post_cv_result,
          log_post_2 = log_post - max(log_post)) %>% 
@@ -598,11 +599,11 @@ cv_param_grid %>%
                color = "black") +
   # include the initial guess points
   geom_point(data = tibble::tibble(attempt = as.character(1:2),
-                                   mu = ,
-                                   varphi = ),
+                                   mu = c(init_guess_01[1],init_guess_02[1]),
+                                   varphi = c(init_guess_01[2],init_guess_02[2])),
              mapping = aes(color = attempt),
              size = 4.5) +
-  scale_fill_viridis_c(guide = FALSE, option = "viridis",
+  scale_fill_viridis_c(guide = "none", option = "viridis",
                        limits = log(c(0.01/100, 1.0))) +
   labs(x = expression(mu), y = expression(varphi)) +
   theme_bw()
@@ -628,14 +629,14 @@ You will now find the posterior mode (the MAP) on the $\mu$ and $\varphi$ parame
 
 Use the first initial guess.  
 
-```{r, solution_04b_a, eval=FALSE}
-map_res_01 <- 
+```{r, solution_04b_a, eval=TRUE}
+map_res_01 <- optim(init_guess_01,my_cv_logpost, gr=NULL, hw06_info,method="BFGS",hessian=TRUE,control=list(fnscale=-1, maxit=1001))
 ```
 
 Use the second initial guess.  
 
-```{r, solution_04b_b, eval=FALSE}
-map_res_02 <- 
+```{r, solution_04b_b, eval=TRUE}
+map_res_02 <- optim(init_guess_02,my_cv_logpost, gr=NULL, hw06_info,method="BFGS",hessian=TRUE,control=list(fnscale=-1, maxit=1001))
 ```
 
 ### 4c)
@@ -648,7 +649,13 @@ You tried two different starting guesses...are the optimization results differen
 
 #### SOLUTION
 
-Include as many code chunks and discussion text as you feel are necessary.  
+```{r}
+map_res_01
+map_res_02
+```
+The identified optimal parameter values are the same. The Hessian matrices are the same. Two things are different: the count of function and gradient. Second guess has more count, which means it takes more steps to MAP.
+
+The location and position of two initial guess points in log-posterior surface gives hint about the two different results. The second guess located outside of the 99% contour line while the first guess located between 90% and 99% contour line.The first guess also locate in part where the color is more yellow and second guess locates in a bluer shade. These mean that the distance from first guess to MAP is closer than the second guess to MAP. 
 
 ### 4d)
 
@@ -660,26 +667,26 @@ Finding the posterior mode is the first step in the Laplace Approximation. The s
 
 Complete the missing pieces of the code chunk below. The last portion of the `my_laplace()` function compiles the results into a list.  
 
-```{r, solution_04d, eval=FALSE}
+```{r, solution_04d, eval=TRUE}
 my_laplace <- function(start_guess, logpost_func, ...)
 {
   # code adapted from the `LearnBayes`` function `laplace()`
-  fit <- optim( ,
-                ,
+  fit <- optim( start_guess,
+                logpost_func,
                gr = NULL,
                ...,
                method = "BFGS",
                hessian =  TRUE,
                control = list(fnscale = -1, maxit = 5001))
   
-  mode <-  
-  post_var_matrix <- 
+  mode <-  fit$par
+  post_var_matrix <- solve(fit$hessian)
   p <- length(mode)
   # we will discuss what int means in a few weeks...
   int <- p/2 * log(2 * pi) + 0.5 * log(det(post_var_matrix)) + logpost_func(mode, ...)
   # package all of the results into a list
-  list(mode =  ,
-       var_matrix = ,
+  list(mode = mode ,
+       var_matrix = post_var_matrix ,
        log_evidence = int,
        converge = ifelse(fit$convergence == 0,
                          "YES", 
@@ -698,11 +705,13 @@ You will now perform the Laplace Approximation to determine the approximate post
 
 Execute the Laplace Approximation.  
 
-```{r, solution_04e, eval=FALSE}
-laplace_result <-  
+```{r, solution_04e, eval=TRUE}
+laplace_result <-  my_laplace(init_guess_01, my_cv_logpost,hw06_info)
+
+laplace_result
 ```
 
-Include as many code chunks and discussion text as you feel are necessary.  
+The approximate posterior mean is 10.855893  and the approximate posterior standard deviation is 1.090289. The posterior correlation coefficient between $\mu$ and $\varphi$ is -0.01291656.
 
 ## Problem 05
 
@@ -713,8 +722,15 @@ You will now use the Laplace Approximation to answer questions from the toy comp
 **Use the Laplace Approximation result to calculate the probability that the unknown mean, $\mu$, is less than the sample average.**  
 
 #### SOLUTION
+```{r, solution_05a, eval=TRUE}
+inig=c(x_mean,log(x_sdd))
+laplace_result1 <-  my_laplace(inig, my_logpost,hw06_info)
+laplace_result1
+```
+
 
 Include as many code chunks and discussion text as you feel are necessary.  
+Since sample average is 10.218
 
 ### 5b)
 
