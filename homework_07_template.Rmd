@@ -104,17 +104,18 @@ You are allowed to use the `model.matrix()` function shown in lecture to create 
 
 ```{r, solution_for_1b_a, eval=TRUE}
 ### make the design matrix for the SMALL data
-Xmat_quad_small <- model.matrix(y~x+x^2, quad_data_small)
+Xmat_quad_small <- model.matrix(y~x+I(x^2), quad_data_small)
 ```
 
 
 ```{r, solution_for_1b_b, eval=TRUE}
 ### make the design matrix for the BIG data
-Xmat_quad_big <- model.matrix(y~x+x^2, quad_data_big)
+Xmat_quad_big <- model.matrix(y~x+I(x^2), quad_data_big)
 ```
 
 
 ### 1c)
+
 
 **How many rows and columns does EACH design matrix have?**  
 
@@ -210,16 +211,14 @@ You **MUST** continue to assume that the prior does not matter and thus are assu
 
 ```{r, solution_for_1g_a, eval=TRUE}
 ### posterior mean vector for the SMALL data
-x_quad_small_col <- quad_data_small %>% pull(x) %>% as.matrix()
-postmeans_quad_small_noprior <- solve(t(x_quad_small_col) %*% x_quad_small_col) * (t(x_quad_small_col)%*% y_quad_small_col)
+postmeans_quad_small_noprior <- solve(t(Xmat_quad_small) %*% Xmat_quad_small) %*% (t(Xmat_quad_small)%*% y_quad_small_col)
 postmeans_quad_small_noprior 
 ```
 
 
 ```{r, solution_for_1g_b, eval=TRUE}
 ### posterior mean vector for the BIG data
-x_quad_big_col <- quad_data_big %>% pull(x) %>% as.matrix()
-postmeans_quad_big_noprior <- solve(t(x_quad_big_col) %*% x_quad_big_col) * (t(x_quad_big_col)%*% y_quad_big_col)
+postmeans_quad_big_noprior <- solve(t(Xmat_quad_big) %*% Xmat_quad_big) %*% (t(Xmat_quad_big)%*% y_quad_big_col)
 postmeans_quad_big_noprior 
 ```
 
@@ -261,13 +260,14 @@ You will specify the prior by creating the prior covariance matrix.
 
 ```{r, solution_for_2a_a, eval=TRUE}
 ### prior covariance matrix for the INFORMATIVE prior
-B0_inform <-(1.4)^2 * diag(2)
+B0_inform <-(1.4)^2 * diag(3)
 ```
 
 
 ```{r, solution_for_2a_b, eval=TRUE}
 ### prior covariance matrix for the VAGUE prior
-B0_vague <- 30^2 * diag(2)
+B0_vague <- 30^2 * diag(3)
+(t(Xmat_quad_small) %*% Xmat_quad_small)
 ```
 
 
@@ -469,7 +469,7 @@ lm_logpost <- function(unknowns, my_info)
 Test out `lm_logpost()` with guess values of -1 for all parameters.  
 
 ```{r, solution_03b_c}
-lm_logpost(c(-1,-1,-1,-1,-1),info_quad)
+lm_logpost(c(-1,-1,-1,-1),info_quad)
 
 ```
 
@@ -477,9 +477,7 @@ lm_logpost(c(-1,-1,-1,-1,-1),info_quad)
 Test out `lm_logpost()` with guess values of 1 for all parameters.  
 
 ```{r, solution_03b_b}
-a<-t(as.matrix(c(-1,-1,-1,-1)))
-#as.numeric(a[1:length(a)-1])
-as.vector(a[1:length(a)-1])
+lm_logpost(c(1,1,1,1),info_quad)
 ```
 
 
@@ -506,9 +504,9 @@ my_laplace <- function(start_guess, logpost_func, ...)
                control = list(fnscale = -1, maxit = 1001))
   
   mode <- fit$par
-  post_var_matrix <- solve(fit$hessian)
+  post_var_matrix <- -solve(fit$hessian)
   p <- length(mode) # number of unknown parameters
-  int <- p/2 * log(2*pi) +0.5 * log(det(h)) + logpost_func(mode, ...)
+  int <- p / 2 * log(2 * pi) + 0.5 * log(det(post_var_matrix)) + logpost_func(mode, ...)
   # package all of the results into a list
   list(mode = mode,
        var_matrix = post_var_matrix,
@@ -518,18 +516,25 @@ my_laplace <- function(start_guess, logpost_func, ...)
                          "NO"),
        iter_counts = as.numeric(fit$counts[1]))
 }
+
 ```
 
 Fit the Bayesian linear model.  
 
 ```{r, solution_03c_b, eval=TRUE}
-laplace_quad <- my_laplace(0,)
+laplace_quad <- my_laplace(c(0,0,0,0),lm_logpost, info_quad)
+laplace_quad 
 ```
 
 Display the posterior mode and posterior standard deviations.  
 
 ```{r, solution_03c_c}
 ###
+laplace_quad$mode
+sqrt(laplace_quad$var_matrix[1,1])
+sqrt(laplace_quad$var_matrix[2,2])
+sqrt(laplace_quad$var_matrix[3,3])
+sqrt(laplace_quad$var_matrix[4,4])
 ```
 
 Should you be worried about the initial guess impacted results?  
@@ -544,29 +549,30 @@ After completing the function, generate 2500 posterior samples of the parameters
 
 #### SOLUTION
 
-```{r, solution_03d, eval=FALSE}
+```{r, solution_03d, eval=TRUE}
 generate_lm_post_samples <- function(mvn_result, length_beta, num_samples)
 {
   MASS::mvrnorm(n = num_samples,
-                mu = mvn_result$ ,
-                Sigma = mvn_result$ ) %>% 
+                mu = mvn_result$mode,
+                Sigma = mvn_result$ var_matrix) %>% 
     as.data.frame() %>% tibble::as_tibble() %>% 
     purrr::set_names(c(sprintf("beta_%02d", 0:(length_beta-1)), "varphi")) %>% 
-    mutate(sigma =  )
+    mutate(sigma = exp(varphi))
 }
 ```
 
 Generate posterior samples.  
 
-```{r, solution_03d_b, eval=FALSE}
+```{r, solution_03d_b, eval=TRUE}
 set.seed(87123)
-post_samples_quad <- 
+post_samples_quad <- generate_lm_post_samples(laplace_quad, ncol(Xmat_quad_big),2500)
 ```
 
 Create the posterior histogram on $\beta_2$ and calculate the probability that $\beta_2$ is greater than zero.  
 
 ```{r, solution_03d_c}
 ###
+ggplot(post_samples_quad, aes(x=beta_02))+ geom_histogram(bins = 55)
 ```
 
 
@@ -586,11 +592,11 @@ The `post_lm_pred_trend_samples()` returns the `Umat` and `Ymat` matrices contai
 
 #### SOLUTION
 
-```{r, solution_02a, eval=FALSE}
+```{r, solution_02a, eval=TRUE}
 post_lm_pred_trend_samples <- function(Xnew, Bmat)
 {
   # matrix of posterior trend predictions
-  Umat <- 
+  Umat <- Xnew %*% t(Bmat)
   
   # return Umat, completed for you
   Umat
@@ -617,21 +623,24 @@ You now have enough pieces in place to generate posterior predictions from your 
 
 **Make posterior predictions of the trend on the "big" quadratic demo training set. Assign the posterior trend predictions to the `post_trend_samples_quad` object. What are the dimensions of `post_trend_samples_quad`? What do the rows and columns correspond to?**  
 
+
 #### SOLUTION
 
 Make posterior predictions on the training set.  
 
-```{r, solution_04b, eval=FALSE}
-post_trend_samples_quad <- 
+```{r, solution_04b, eval=TRUE}
+post_trend_samples_quad <- make_post_lm_pred(Xmat_quad_big,post_samples_quad)
 ```
 
 The dimensionality of the posterior predicted mean trend matrix is:  
 
-```{r, solution_04b_b, eval=FALSE}
-### 
+```{r, solution_04b_b, eval=TRUE}
+dim(post_trend_samples_quad)
 ```
 
 What do the rows and columns correspond to?  
+30X2500. There are 30 rows and 2500 columns
+
 
 ### 4c)
 
@@ -643,15 +652,16 @@ You will now use the model predictions to calculate the error between the model 
 
 The error between the first 3 posterior predicted mean trend samples and the training set observations are calculated below.  
 
-```{r, solution_04c, eval=FALSE}
+```{r, solution_04c, eval=TRUE}
 ### error of the first posterior sample
-error_quad_post_01 <- 
+error_quad_post_01 <- quad_data_big$y-post_trend_samples_quad[,1]
 
 ### error of the second posterior sample
-error_quad_post_02 <- 
+error_quad_post_02 <- quad_data_big$y-post_trend_samples_quad[,2]
 
 ### error of the third posterior sample
-error_quad_post_03 <- 
+error_quad_post_03 <- quad_data_big$y-post_trend_samples_quad[,3]
+
 ```
 
 ### 4d)
@@ -669,21 +679,26 @@ You will now calculate the Mean Absolute Error (MAE) associated with each of the
 ?  
 
 ```{r, solution_04d}
-###
+length(error_quad_post_01)
 ```
 
 
 Now calculate the MAE associated with each of the first three posterior samples.  
 
-```{r, solution_04d_b, eval=FALSE}
-mae_quad_post_01 <- 
+```{r, solution_04d_b, eval=TRUE}
+mae_quad_post_01 <- mean(abs(error_quad_post_01))
 
-mae_quad_post_02 <- 
+mae_quad_post_02 <- mean(abs(error_quad_post_02))
 
-mae_quad_post_03 <- 
+mae_quad_post_03 <- mean(abs(error_quad_post_03))
+
+mae_quad_post_01
+mae_quad_post_02
+mae_quad_post_03
 ```
 
 ?  
+we are averaging over the length of the error vector. The MAE are not the same, because there are difference in posterior of randomly generated samples. 
 
 ### 4e)
 
@@ -710,9 +725,9 @@ You will use this fact to calculate the error associated with each training poin
 
 #### SOLUTION
 
-```{r, solution_04e, eval=FALSE}
-absError_quad_mat <- 
-
+```{r, solution_04e, eval=TRUE}
+absError_quad_mat <- abs(quad_data_big$y-post_trend_samples_quad)
+dim(absError_quad_mat)
 ### dimensions?
 ```
 
@@ -729,18 +744,20 @@ You must now summarize the absolute value errors by averaging them appropriately
 
 Which function?  
 
-```{r, solution_04f, eval=FALSE}
-MAE_quad <- 
+```{r, solution_04f, eval=TRUE}
+MAE_quad <- colMeans(absError_quad_mat)
 
 ### data type?
-
+class(MAE_quad)
 ### length?
+length(MAE_quad)
 ```
 
 Check with the results you calculated previously.  
 
-```{r, solution_04f_b, eval=FALSE}
+```{r, solution_04f_b, eval=TRUE}
 ### your code here
+MAE_quad[1:3]== c(mae_quad_post_01, mae_quad_post_02, mae_quad_post_03)
 ```
 
 
@@ -757,11 +774,13 @@ You have calculated the MAE associated with each posterior sample, and thus repr
 
 Calculate the Quantiles of the MAE below.  
 
-```{r, solution_04g, eval=FALSE}
+```{r, solution_04g, eval=TRUE}
 ### 
+quantile(MAE_quad)
 ```
 
 Why is the MAE uncertain?  
+Because the posterior samples are randomly generated, so the variance are uncertain. So is MAE.
 
 ## Problem 05
 
@@ -798,7 +817,7 @@ It's always a good idea to start out by visualizing the data before modeling.
 #### SOLUTION
 
 ```{r solution_05a}
-###
+ggplot(train_df,aes(x,y)) +geom_point() +geom_point(data=test_df,colour='red') 
 ```
 
 
